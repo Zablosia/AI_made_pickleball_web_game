@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PICKLEBALL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #0f1a0f;
+    --player: #a8e063;
+    --cpu: #ff6b35;
+    --ball: #f5e642;
+    --glow-player: 0 0 20px #a8e06388;
+    --glow-cpu: 0 0 20px #ff6b3588;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    user-select: none;
+  }
+
+  /* ── TOP CONTROLS ── */
+  #top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 2px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .ctrl-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #2a4a2a;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #difficulty-group { display: flex; align-items: center; gap: 5px; }
+
+  .diff-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+    border-radius: 2px;
+    border: 1px solid #1a3a1a;
+    background: transparent;
+    color: #3a5a3a;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .diff-btn:hover { border-color: #4a7a4a; color: #6a9a6a; }
+  .diff-btn.active-easy   { border-color: #a8e063; color: #a8e063; background: rgba(168,224,99,0.08);  text-shadow: 0 0 8px #a8e06366; }
+  .diff-btn.active-medium { border-color: #f5a623; color: #f5a623; background: rgba(245,166,35,0.08);  text-shadow: 0 0 8px #f5a62366; }
+  .diff-btn.active-hard   { border-color: #ff6b35; color: #ff6b35; background: rgba(255,107,53,0.08);  text-shadow: 0 0 8px #ff6b3566; }
+
+  #points-group { display: flex; align-items: center; gap: 6px; }
+
+  .pts-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    width: 26px; height: 26px;
+    border-radius: 2px;
+    border: 1px solid #1a3a1a;
+    background: transparent;
+    color: #3a5a3a;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.15s;
+  }
+  .pts-btn:hover { border-color: #4a7a4a; color: #aaa; }
+
+  #pts-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: #e8f5e0;
+    min-width: 30px;
+    text-align: center;
+    line-height: 1;
+  }
+
+  #start-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 3px;
+    padding: 5px 20px;
+    border-radius: 2px;
+    border: 1px solid var(--player);
+    background: transparent;
+    color: var(--player);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  #start-btn:hover { background: var(--player); color: var(--bg); }
+  #start-btn.restart { border-color: #f5a623; color: #f5a623; }
+  #start-btn.restart:hover { background: #f5a623; color: var(--bg); }
+
+  /* ── CANVAS ── */
+  #game-wrap { position: relative; flex-shrink: 0; }
+  canvas { display: block; border: 1px solid #1a3a1a; border-radius: 4px; }
+
+  /* Win overlay */
+  #overlay {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(10,20,10,0.9);
+    border-radius: 4px; gap: 10px;
+  }
+  #overlay.visible { display: flex; }
+  #overlay-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 58px; letter-spacing: 6px; color: #e8f5e0;
+  }
+  #overlay-sub { font-size: 12px; color: #3a6a3a; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── BOTTOM SCORE BAR ── */
+  #score-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 0 2px 0;
+    flex-shrink: 0;
+    gap: 0;
+  }
+
+  .score-side { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .score-side.right { justify-content: flex-end; }
+
+  .player-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 12px; letter-spacing: 4px; opacity: 0.5;
+  }
+  .player-label.you { color: var(--player); }
+  .player-label.cpu-lbl { color: var(--cpu); }
+
+  .score-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px; line-height: 1; min-width: 44px; text-align: center;
+  }
+  #score-you { color: var(--player); text-shadow: var(--glow-player); }
+  #score-cpu { color: var(--cpu);    text-shadow: var(--glow-cpu); }
+
+  .score-sep {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px; color: #1a3a1a; padding: 0 8px; flex-shrink: 0;
+  }
+
+  .pips { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; max-width: 110px; }
+  .pip {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #1a3a1a; transition: background 0.2s;
+  }
+  .pip.lit-you { background: var(--player); box-shadow: 0 0 5px #a8e06388; }
+  .pip.lit-cpu { background: var(--cpu);    box-shadow: 0 0 5px #ff6b3588; }
+
+  /* Dink counter - centered between scores */
+  #dink-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+    padding: 0 8px;
+  }
+  #dink-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #2a5a2a;
+    text-transform: uppercase;
+  }
+  #dink-count {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 30px;
+    line-height: 1;
+    color: #3a6a3a;
+    transition: color 0.2s, text-shadow 0.2s;
+  }
+  #dink-count.active {
+    color: #a8e063;
+    text-shadow: 0 0 12px #a8e06399;
+  }
+  #dink-count.hot {
+    color: #f5e642;
+    text-shadow: 0 0 14px #f5e64299;
+  }
+
+  #keys-hint {
+    font-size: 10px; color: #1a3010; letter-spacing: 2px;
+    text-align: center; padding-bottom: 3px; flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="top-bar">
+  <div id="difficulty-group">
+    <span class="ctrl-label">Difficulty</span>
+    <button class="diff-btn active-easy" data-diff="easy">Easy</button>
+    <button class="diff-btn" data-diff="medium">Medium</button>
+    <button class="diff-btn" data-diff="hard">Hard</button>
+  </div>
+  <div id="points-group">
+    <span class="ctrl-label">First to</span>
+    <button class="pts-btn" id="pts-down">−</button>
+    <div id="pts-display">11</div>
+    <button class="pts-btn" id="pts-up">+</button>
+    <span class="ctrl-label">pts</span>
+  </div>
+  <button id="start-btn">▶ START</button>
+</div>
+
+<div id="game-wrap">
+  <canvas id="c"></canvas>
+  <div id="overlay">
+    <div id="overlay-title">PICKLEBALL</div>
+    <div id="overlay-sub">All 4 arrow keys to move · approach the kitchen to dink</div>
+  </div>
+</div>
+
+<div id="score-bar">
+  <div class="score-side left">
+    <span class="player-label you">YOU</span>
+    <div class="score-val" id="score-you">0</div>
+    <div class="pips" id="pips-you"></div>
+  </div>
+
+  <div id="dink-wrap">
+    <div id="dink-label">dink rally</div>
+    <div id="dink-count">—</div>
+  </div>
+
+  <div class="score-side right">
+    <div class="pips" id="pips-cpu"></div>
+    <div class="score-val" id="score-cpu">0</div>
+    <span class="player-label cpu-lbl">CPU</span>
+  </div>
+</div>
+
+<div id="keys-hint">ARROW KEYS TO MOVE &nbsp;·&nbsp; APPROACH THE KITCHEN LINE TO DINK</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+function sizeCanvas() {
+  const topH   = document.getElementById('top-bar').offsetHeight;
+  const scoreH = document.getElementById('score-bar').offsetHeight;
+  const hintH  = document.getElementById('keys-hint').offsetHeight;
+  const pad    = 20;
+  const avail  = window.innerHeight - topH - scoreH - hintH - pad;
+  const h = Math.max(280, Math.min(480, avail));
+  const w = Math.round(h * (800 / 480));
+  canvas.width  = w;
+  canvas.height = h;
+  document.getElementById('top-bar').style.width   = w + 'px';
+  document.getElementById('score-bar').style.width = w + 'px';
+  return { w, h };
+}
+let { w: W, h: H } = sizeCanvas();
+
+// ── DIFFICULTY ──
+const DIFFICULTY = {
+  easy:   { cpuSpeed: 2.6, cpuNoise: 30, ballMax: 11, cpuDinkNoise: 20 },
+  medium: { cpuSpeed: 4.1, cpuNoise: 12, ballMax: 14, cpuDinkNoise: 10 },
+  hard:   { cpuSpeed: 5.8, cpuNoise: 3,  ballMax: 16, cpuDinkNoise: 4  },
+};
+let activeDiff = 'easy';
+let winScore   = 11;
+let diffCfg    = DIFFICULTY[activeDiff];
+
+// ── DIMENSIONS ──
+const PADDLE_W     = () => Math.round(W * 0.022);
+const PADDLE_H     = () => Math.round(H * 0.22);
+const PADDLE_SPEED = () => H * 0.013;
+const BALL_R       = () => Math.round(W * 0.013);
+const BASE_SPEED   = () => W * 0.007;
+const KITCHEN_FRAC = 0.22; // fraction of half-width
+const LEFT_KITCHEN_X  = () => W/2 - W * KITCHEN_FRAC;
+const RIGHT_KITCHEN_X = () => W/2 + W * KITCHEN_FRAC;
+
+// Dink constants
+const DINK_SPEED     = () => BASE_SPEED() * 0.52;  // much slower
+const DINK_MAX_ANGLE = 18 * Math.PI / 180;          // very flat return angle
+const VOLLEY_MAX_ANGLE = 52 * Math.PI / 180;
+const DINK_ACCEL     = 1.0;   // no acceleration on dinks
+const VOLLEY_ACCEL   = 1.06;
+
+const colors = {
+  bg: '#121f12', floor: '#162616', line: '#1e4a1e',
+  kitchen: 'rgba(255,255,255,0.03)',
+  player: '#a8e063', cpu: '#ff6b35',
+  ball: '#f5e642',
+  ballDink: '#d0eeff',          // pale blue-white during dink rally
+  trailVolley: 'rgba(245,230,66,',
+  trailDink:   'rgba(208,238,255,',
+};
+
+let state = 'idle';
+let playerScore = 0, cpuScore = 0;
+let keys = {};
+let dinkStreak = 0;           // consecutive dink hits this rally
+let isDinkRally = false;      // true while both sides are in dink mode
+let kitchenFlash = 0;         // countdown for kitchen line flash on hit
+let floatLabels  = [];        // floating "DINK" text objects
+let lastHitWasDink = false;   // was the most recent hit a dink?
+
+function makePaddles() {
+  const pw = PADDLE_W(), ph = PADDLE_H();
+  return {
+    player: { x: W*0.04, y: H/2 - ph/2, w: pw, h: ph },
+    cpu:    { x: W - W*0.04 - pw, y: H/2 - ph/2, w: pw, h: ph, kitchenX: RIGHT_KITCHEN_X() },
+  };
+}
+let { player, cpu } = makePaddles();
+let ball = { x: W/2, y: H/2, r: BALL_R(), vx: 0, vy: 0 };
+let trail = [], particles = [];
+
+// ── PIPS ──
+function buildPips() {
+  ['pips-you','pips-cpu'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    for (let i = 0; i < winScore; i++) {
+      const d = document.createElement('div');
+      d.className = 'pip'; el.appendChild(d);
+    }
+  });
+}
+function updatePips() {
+  const yp = document.getElementById('pips-you').children;
+  const cp = document.getElementById('pips-cpu').children;
+  for (let i = 0; i < winScore; i++) {
+    yp[i].className = 'pip' + (i < playerScore ? ' lit-you' : '');
+    cp[i].className = 'pip' + (i < cpuScore    ? ' lit-cpu' : '');
+  }
+}
+buildPips();
+
+function updateDinkUI() {
+  const el = document.getElementById('dink-count');
+  if (dinkStreak === 0) {
+    el.textContent = '—';
+    el.className = '';
+  } else {
+    el.textContent = dinkStreak;
+    el.className = dinkStreak >= 5 ? 'hot' : 'active';
+  }
+}
+
+// ── BALL ──
+function resetBall(dir = 1) {
+  ball.x = W/2; ball.y = H/2; ball.r = BALL_R();
+  const angle = (Math.random() * 36 - 18) * Math.PI / 180;
+  const speed = BASE_SPEED();
+  ball.vx = dir * speed * Math.cos(angle);
+  ball.vy = speed * Math.sin(angle);
+  trail = [];
+  dinkStreak = 0;
+  isDinkRally = false;
+  lastHitWasDink = false;
+  updateDinkUI();
+}
+
+function launchPoint(scorer) {
+  state = 'point';
+  setTimeout(() => {
+    if (playerScore < winScore && cpuScore < winScore) {
+      state = 'playing';
+      resetBall(scorer === 'player' ? -1 : 1);
+    }
+  }, 900);
+}
+
+function spawnParticles(x, y, color, count = 12) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 1 + Math.random() * 3;
+    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color });
+  }
+}
+
+function spawnDinkLabel(x, y) {
+  floatLabels.push({ x, y, life: 1, text: 'DINK', color: colors.ballDink });
+}
+
+// ── IS PLAYER IN KITCHEN ZONE? ──
+// Player is "at the kitchen" if their paddle's right edge is within 6px of the kitchen line
+function playerAtKitchen() {
+  const kx = LEFT_KITCHEN_X();
+  const edge = player.x + player.w;
+  return edge >= kx - 6;
+}
+
+// CPU is "at the kitchen" if its left edge is within 6px of the right kitchen line
+function cpuAtKitchen() {
+  return cpu.x <= cpu.kitchenX + 6;
+}
+
+// ── UPDATE ──
+function update() {
+  if (state !== 'playing') return;
+  const ph = PADDLE_H(), ps = PADDLE_SPEED(), pw = PADDLE_W();
+  const kxLeft  = LEFT_KITCHEN_X();
+  const kxRight = RIGHT_KITCHEN_X();
+
+  // ── Player movement ──
+  if (keys['ArrowUp'])    player.y -= ps;
+  if (keys['ArrowDown'])  player.y += ps;
+  if (keys['ArrowLeft'])  player.x -= ps;
+  if (keys['ArrowRight']) player.x += ps;
+  player.y = Math.max(0, Math.min(H - ph, player.y));
+  player.x = Math.max(W * 0.01, Math.min(kxLeft - pw, player.x));
+
+  // ── CPU AI ──
+  const cpuCenter = cpu.y + ph / 2;
+  // If ball is on CPU side and slow (dink mode), CPU moves toward kitchen
+  const ballOnCpuSide = ball.vx > 0;
+  const ballIsSlow    = Math.hypot(ball.vx, ball.vy) < BASE_SPEED() * 0.85;
+
+  if (ballOnCpuSide && ballIsSlow) {
+    // Approach kitchen
+    const targetX = kxRight - pw - 2;
+    if (cpu.x > targetX + 2) cpu.x -= ps * 0.7;
+    else if (cpu.x < targetX - 2) cpu.x += ps * 0.7;
+  } else if (!ballOnCpuSide) {
+    // Retreat to baseline when ball is coming back
+    const baseX = W - W*0.04 - pw;
+    if (cpu.x < baseX - 2) cpu.x += ps * 0.5;
+    else if (cpu.x > baseX + 2) cpu.x -= ps * 0.5;
+  }
+  cpu.x = Math.max(kxRight, Math.min(W - W*0.01 - pw, cpu.x));
+  cpu.kitchenX = kxRight;
+
+  const noiseScale = ballIsSlow ? diffCfg.cpuDinkNoise : diffCfg.cpuNoise;
+  const targetY = ball.y + (Math.random()-0.5) * noiseScale;
+  if (cpuCenter < targetY - 4) cpu.y += diffCfg.cpuSpeed;
+  else if (cpuCenter > targetY + 4) cpu.y -= diffCfg.cpuSpeed;
+  cpu.y = Math.max(0, Math.min(H - ph, cpu.y));
+
+  // ── Trail ──
+  trail.push({ x: ball.x, y: ball.y, dink: isDinkRally });
+  if (trail.length > 12) trail.shift();
+
+  // ── Move ball ──
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // Wall bounce
+  if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy = Math.abs(ball.vy); }
+  if (ball.y + ball.r > H) { ball.y = H - ball.r; ball.vy = -Math.abs(ball.vy); }
+
+  // ── Player paddle hit ──
+  if (ball.vx < 0 &&
+      ball.x - ball.r < player.x + pw &&
+      ball.x - ball.r > player.x &&
+      ball.y > player.y && ball.y < player.y + ph) {
+
+    const atKitchen = playerAtKitchen();
+    const hitPos = (ball.y - (player.y + ph/2)) / (ph/2);
+
+    if (atKitchen) {
+      // ── DINK ──
+      const angle = hitPos * DINK_MAX_ANGLE;
+      const speed = DINK_SPEED();
+      ball.vx = speed * Math.cos(angle);
+      ball.vy = speed * Math.sin(angle);
+      ball.x  = player.x + pw + ball.r;
+      dinkStreak++;
+      isDinkRally = true;
+      lastHitWasDink = true;
+      kitchenFlash = 18;
+      spawnParticles(ball.x, ball.y, colors.ballDink, 8);
+      spawnDinkLabel(ball.x + 10, ball.y - 18);
+      updateDinkUI();
+    } else {
+      // ── VOLLEY ──
+      const angle = hitPos * VOLLEY_MAX_ANGLE;
+      const speed = Math.min(Math.hypot(ball.vx, ball.vy) * VOLLEY_ACCEL, diffCfg.ballMax);
+      ball.vx = speed * Math.cos(angle);
+      ball.vy = speed * Math.sin(angle);
+      ball.x  = player.x + pw + ball.r;
+      // Break dink rally
+      if (isDinkRally) { dinkStreak = 0; isDinkRally = false; updateDinkUI(); }
+      lastHitWasDink = false;
+      spawnParticles(ball.x, ball.y, colors.player);
+    }
+  }
+
+  // ── CPU paddle hit ──
+  if (ball.vx > 0 &&
+      ball.x + ball.r > cpu.x &&
+      ball.x + ball.r < cpu.x + pw &&
+      ball.y > cpu.y && ball.y < cpu.y + ph) {
+
+    const atKitchen = cpuAtKitchen();
+    const hitPos = (ball.y - (cpu.y + ph/2)) / (ph/2);
+
+    if (atKitchen || lastHitWasDink) {
+      // CPU responds with dink when it's at the kitchen OR returning a dink
+      const angle = hitPos * DINK_MAX_ANGLE;
+      const speed = DINK_SPEED() * (0.9 + Math.random() * 0.2); // slight variation
+      ball.vx = -speed * Math.cos(angle);
+      ball.vy =  speed * Math.sin(angle);
+      ball.x  = cpu.x - ball.r;
+      dinkStreak++;
+      isDinkRally = true;
+      lastHitWasDink = true;
+      spawnParticles(ball.x, ball.y, colors.ballDink, 8);
+      spawnDinkLabel(ball.x - 10, ball.y - 18);
+      updateDinkUI();
+    } else {
+      // Volley return
+      const angle = hitPos * VOLLEY_MAX_ANGLE;
+      const speed = Math.min(Math.hypot(ball.vx, ball.vy) * VOLLEY_ACCEL, diffCfg.ballMax);
+      ball.vx = -speed * Math.cos(angle);
+      ball.vy =  speed * Math.sin(angle);
+      ball.x  = cpu.x - ball.r;
+      if (isDinkRally) { dinkStreak = 0; isDinkRally = false; updateDinkUI(); }
+      lastHitWasDink = false;
+      spawnParticles(ball.x, ball.y, colors.cpu);
+    }
+  }
+
+  // ── Scoring ──
+  if (ball.x < -20) {
+    cpuScore++;
+    document.getElementById('score-cpu').textContent = cpuScore;
+    updatePips();
+    if (cpuScore >= winScore) endGame('cpu'); else launchPoint('cpu');
+  }
+  if (ball.x > W + 20) {
+    playerScore++;
+    document.getElementById('score-you').textContent = playerScore;
+    updatePips();
+    if (playerScore >= winScore) endGame('player'); else launchPoint('player');
+  }
+
+  // ── Particles ──
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.life -= 0.055;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // ── Float labels ──
+  for (let i = floatLabels.length-1; i >= 0; i--) {
+    const l = floatLabels[i];
+    l.y -= 0.7;
+    l.life -= 0.03;
+    if (l.life <= 0) floatLabels.splice(i, 1);
+  }
+
+  if (kitchenFlash > 0) kitchenFlash--;
+}
+
+// ── DRAW ──
+
+function drawPaddle(p, color, isAtKitchen) {
+  ctx.save();
+  // Extra glow when at kitchen (dink mode)
+  ctx.shadowBlur  = isAtKitchen ? 26 : 16;
+  ctx.shadowColor = isAtKitchen ? colors.ballDink : color;
+  ctx.fillStyle   = isAtKitchen ? lerpColor(color, colors.ballDink, 0.35) : color;
+
+  const r = 4;
+  ctx.beginPath();
+  ctx.moveTo(p.x+r, p.y);
+  ctx.lineTo(p.x+p.w-r, p.y); ctx.quadraticCurveTo(p.x+p.w, p.y, p.x+p.w, p.y+r);
+  ctx.lineTo(p.x+p.w, p.y+p.h-r); ctx.quadraticCurveTo(p.x+p.w, p.y+p.h, p.x+p.w-r, p.y+p.h);
+  ctx.lineTo(p.x+r, p.y+p.h); ctx.quadraticCurveTo(p.x, p.y+p.h, p.x, p.y+p.h-r);
+  ctx.lineTo(p.x, p.y+r); ctx.quadraticCurveTo(p.x, p.y, p.x+r, p.y);
+  ctx.closePath(); ctx.fill();
+
+  // Grid texture
+  ctx.save();
+  ctx.globalAlpha = 0.18; ctx.strokeStyle = '#000'; ctx.lineWidth = 0.8;
+  const rows = 5, cols = 2;
+  const cellW = p.w/cols, cellH = p.h/rows;
+  for (let r2=1; r2<rows; r2++) {
+    ctx.beginPath(); ctx.moveTo(p.x+2, p.y+r2*cellH); ctx.lineTo(p.x+p.w-2, p.y+r2*cellH); ctx.stroke();
+  }
+  for (let c=1; c<cols; c++) {
+    ctx.beginPath(); ctx.moveTo(p.x+c*cellW, p.y+4); ctx.lineTo(p.x+c*cellW, p.y+p.h-4); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawBall(x, y, r) {
+  const ballColor = isDinkRally ? colors.ballDink : colors.ball;
+  ctx.save();
+  ctx.shadowBlur = 18; ctx.shadowColor = ballColor;
+  ctx.fillStyle = ballColor;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+
+  ctx.globalCompositeOperation = 'destination-out';
+  const holeR = Math.max(1.2, r * 0.22);
+  const holes = [[-0.35,-0.35],[0.35,-0.35],[-0.35,0.35],[0.35,0.35],[0,0]];
+  for (const [dx,dy] of holes) {
+    ctx.beginPath(); ctx.arc(x+dx*r, y+dy*r, holeR, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 0.35; ctx.fillStyle = '#000';
+  for (const [dx,dy] of holes) {
+    ctx.beginPath(); ctx.arc(x+dx*r, y+dy*r, holeR*1.25, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCourt() {
+  ctx.fillStyle = colors.floor; ctx.fillRect(0,0,W,H);
+
+  // Outer boundary
+  ctx.strokeStyle = colors.line; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.strokeRect(2,2,W-4,H-4);
+
+  // Center vertical line
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+
+  const kDepth = W * KITCHEN_FRAC;
+  const kLeft  = W/2 - kDepth;
+  const kRight = W/2 + kDepth;
+
+  // Kitchen fill
+  ctx.fillStyle = colors.kitchen;
+  ctx.fillRect(kLeft, 0, kDepth*2, H);
+
+  // Kitchen lines (normal)
+  ctx.strokeStyle = colors.line; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(kLeft,0);  ctx.lineTo(kLeft,H);  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(kRight,0); ctx.lineTo(kRight,H); ctx.stroke();
+
+  // Service lines
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0,H/2);  ctx.lineTo(kLeft,H/2);  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(kRight,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+
+  // Kitchen labels
+  ctx.save();
+  ctx.font = `bold ${Math.round(H*0.028)}px 'Bebas Neue', sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.textAlign = 'center';
+  ctx.fillText('KITCHEN', kLeft  + kDepth/2, H/2 + 2);
+  ctx.fillText('KITCHEN', kRight - kDepth/2, H/2 + 2);
+  ctx.restore();
+
+  // Kitchen line glow: player approaching
+  const pEdge = player.x + player.w;
+  const pDist = kLeft - pEdge;
+  if (pDist < 50 && pDist >= 0) {
+    const t = 1 - pDist/50;
+    ctx.save();
+    ctx.shadowBlur  = 14 * t; ctx.shadowColor = `rgba(168,224,99,${t})`;
+    ctx.strokeStyle = `rgba(168,224,99,${0.25 + t*0.55})`;
+    ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(kLeft,0); ctx.lineTo(kLeft,H); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Kitchen flash on dink hit
+  if (kitchenFlash > 0) {
+    const t = kitchenFlash / 18;
+    ctx.save();
+    ctx.shadowBlur  = 22 * t; ctx.shadowColor = colors.ballDink;
+    ctx.strokeStyle = `rgba(208,238,255,${t * 0.9})`;
+    ctx.lineWidth = 3; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(kLeft,0); ctx.lineTo(kLeft,H); ctx.stroke();
+    ctx.restore();
+  }
+
+  // CPU kitchen line glow when CPU at kitchen
+  if (cpuAtKitchen()) {
+    ctx.save();
+    ctx.shadowBlur  = 14; ctx.shadowColor = 'rgba(255,107,53,0.6)';
+    ctx.strokeStyle = 'rgba(255,107,53,0.4)';
+    ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(kRight,0); ctx.lineTo(kRight,H); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Net
+  ctx.setLineDash([5,4]); ctx.strokeStyle = '#3a6a3a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#2a4a2a'; ctx.fillRect(W/2-5,0,10,12); ctx.fillRect(W/2-5,H-12,10,12);
+  ctx.fillStyle = '#1a3a1a'; ctx.fillRect(W/2-3,H/2-6,6,12);
+}
+
+function drawFloatLabels() {
+  ctx.save();
+  ctx.font = `bold ${Math.round(H*0.055)}px 'Bebas Neue', sans-serif`;
+  ctx.textAlign = 'center';
+  for (const l of floatLabels) {
+    const alpha = l.life;
+    const scale = 0.7 + (1 - l.life) * 0.6;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(l.x, l.y);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = colors.ballDink;
+    ctx.shadowBlur = 10; ctx.shadowColor = colors.ballDink;
+    ctx.fillText(l.text, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function draw() {
+  drawCourt();
+
+  // Trail - color depends on dink mode
+  for (let i=0; i<trail.length; i++) {
+    const t = trail[i];
+    const alpha = (i/trail.length) * 0.3;
+    const size  = ball.r * (i/trail.length) * 0.75;
+    const trailColor = t.dink ? colors.trailDink : colors.trailVolley;
+    ctx.beginPath(); ctx.arc(t.x, t.y, size, 0, Math.PI*2);
+    ctx.fillStyle = trailColor + alpha + ')'; ctx.fill();
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2);
+    ctx.fillStyle = p.color + Math.floor(p.life*255).toString(16).padStart(2,'0');
+    ctx.fill();
+  }
+
+  drawPaddle(player, colors.player, playerAtKitchen());
+  drawPaddle(cpu,    colors.cpu,    cpuAtKitchen());
+
+  if (state === 'playing' || state === 'point') drawBall(ball.x, ball.y, ball.r);
+
+  drawFloatLabels();
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+// ── HELPERS ──
+function lerpColor(a, b, t) {
+  const ah = a.replace('#',''), bh = b.replace('#','');
+  const ar = parseInt(ah.slice(0,2),16), ag = parseInt(ah.slice(2,4),16), ab = parseInt(ah.slice(4,6),16);
+  const br = parseInt(bh.slice(0,2),16), bg = parseInt(bh.slice(2,4),16), bb = parseInt(bh.slice(4,6),16);
+  const r  = Math.round(ar+(br-ar)*t).toString(16).padStart(2,'0');
+  const g  = Math.round(ag+(bg-ag)*t).toString(16).padStart(2,'0');
+  const bl = Math.round(ab+(bb-ab)*t).toString(16).padStart(2,'0');
+  return `#${r}${g}${bl}`;
+}
+
+// ── GAME CONTROL ──
+function startGame() {
+  diffCfg = DIFFICULTY[activeDiff];
+  playerScore = 0; cpuScore = 0;
+  document.getElementById('score-you').textContent = '0';
+  document.getElementById('score-cpu').textContent = '0';
+  buildPips(); updatePips();
+  const pp = makePaddles();
+  Object.assign(player, pp.player);
+  Object.assign(cpu, pp.cpu);
+  particles = []; trail = []; floatLabels = [];
+  dinkStreak = 0; isDinkRally = false; kitchenFlash = 0;
+  updateDinkUI();
+  document.getElementById('overlay').classList.remove('visible');
+  const btn = document.getElementById('start-btn');
+  btn.textContent = '↺ RESTART'; btn.classList.add('restart');
+  state = 'playing';
+  resetBall(Math.random()>0.5?1:-1);
+}
+
+function endGame(winner) {
+  state = 'idle';
+  const title = document.getElementById('overlay-title');
+  const sub   = document.getElementById('overlay-sub');
+  title.textContent      = winner==='player' ? 'YOU WIN!' : 'CPU WINS';
+  title.style.color      = winner==='player' ? colors.player : colors.cpu;
+  title.style.textShadow = winner==='player' ? '0 0 30px #a8e063' : '0 0 30px #ff6b35';
+  sub.textContent = `Final: ${playerScore} – ${cpuScore}`;
+  document.getElementById('overlay').classList.add('visible');
+  const btn = document.getElementById('start-btn');
+  btn.textContent = '▶ START'; btn.classList.remove('restart');
+}
+
+// ── BUTTON EVENTS ──
+document.getElementById('start-btn').addEventListener('click', startGame);
+
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.className = 'diff-btn');
+    const d = btn.dataset.diff;
+    btn.classList.add('active-' + d);
+    activeDiff = d; diffCfg = DIFFICULTY[d];
+  });
+});
+
+document.getElementById('pts-down').addEventListener('click', () => {
+  if (winScore > 1) { winScore--; document.getElementById('pts-display').textContent = winScore; buildPips(); updatePips(); }
+});
+document.getElementById('pts-up').addEventListener('click', () => {
+  if (winScore < 21) { winScore++; document.getElementById('pts-display').textContent = winScore; buildPips(); updatePips(); }
+});
+
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Init overlay
+document.getElementById('overlay').classList.add('visible');
+const ot = document.getElementById('overlay-title');
+ot.textContent = 'PICKLEBALL';
+ot.style.color = colors.player;
+ot.style.textShadow = '0 0 30px #a8e063';
+
+loop();
+</script>
+</body>
+</html>
